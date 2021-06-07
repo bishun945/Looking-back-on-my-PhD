@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>.largest[👨🏻‍💻]Looking back on my PhD</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Shun BiNanjing Normal University" />
+    <meta name="date" content="2021-06-07" />
+    <script src="index_files/header-attrs/header-attrs.js"></script>
+    <link href="index_files/tile-view/tile-view.css" rel="stylesheet" />
+    <script src="index_files/tile-view/tile-view.js"></script>
+    <script type="application/json" id="xaringanExtra-editable-docid">{"id":"xa4adb773c064f4390a347c9603d957a","expires":1}</script>
+    <script src="index_files/himalaya/himalaya.js"></script>
+    <script src="index_files/js-cookie/js.cookie.js"></script>
+    <link href="index_files/editable/editable.css" rel="stylesheet" />
+    <script src="index_files/editable/editable.js"></script>
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+    <link rel="stylesheet" href="zh-CN.css" type="text/css" />
+    <link rel="stylesheet" href="extra.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# .largest[👨🏻‍💻]</br>Looking back on my PhD
+## </br>From 2016 to 2021
+### </br>Shun Bi</br>Nanjing Normal University
+### 2021-06-07
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## .center[Preface]
+
+回顾2016年入学至今所做的工作，对这些工作进.red[简单]的总结和介绍。
+
+如果后面有同学觉得好玩（我希望如此），欢迎能在我们当前的基础上继续玩下去。
+
+即便回忆自己过去的研究充满趣味，但仍然能够发现自己在这些工作中存在大量的不足和遗憾，一知半解甚多。大家一定要努力的不断学习！
+
+--
+
+本次报告主要从几个方向进行展开，分别为：
+
+.pull-left[
+
+- 大气校正（影像处理）
+- 生物光学模型（Hydro/EcoLight使用）
+- 水体光学分类 
+
+]
+
+.pull-right[
+
+- 藻类生长模拟
+- 以及一些杂项内容
+
+]
+
+
+为方便后续交流讨论，感兴趣的同学可以在我的Github仓库中找到[这个文档](www.github.com/bishun945)。
+
+---
+class: center, middle, inverse
+
+# Content
+
+.larger[.bold[
+
+.boldred[Atmospheric correction]&lt;br&gt;
+Bio-optical model &lt;br&gt;
+Optical water classification&lt;br&gt;
+Algal growth simulation&lt;br&gt;
+Miscellaneous
+
+]]
+
+---
+layout: true
+
+# Atmospheric correction - Basic theory
+
+---
+
+&lt;center&gt;&lt;img src="./figs/LTOA-contributions700.png" height="330px" /&gt;&lt;/center&gt;
+
+水色遥感的大气校正区别于大气环境遥感，更关注水体自身信号，而非大气部分。对于图中所示TOA的 `\(L_t\)` ，其主要由众多要素构成（ `\(T\)` 和 `\(t\)` 分别为直射与漫射透射率）：
+
+`\begin{align}
+\underbrace{L_t}_{\text{TOA}}
+= 
+\underbrace{L_R + [L_a + L_{aR}]}_{\text{atmos.}} + 
+\underbrace{TL_g}_{\text{sun glint}} + 
+\underbrace{tL_{wc}}_{\text{whitecaps}} + 
+\underbrace{tL_{sky}}_{\text{ref. sky}} + 
+\underbrace{tL_w}_{\text{water}}
+\tag{1}
+\end{align}`
+
+---
+
+将瑞利分子与气溶胶相互作用（多次散射）与气溶胶散射作用综合考虑，即 `\(L_A = L_a + L_{aR}\)` ，同时略去太阳耀斑、天空光、白帽的反射等，公式（1）可以简化为由瑞利分子、气溶胶、漫射透射率和水体反射共同组成的等式（2）：
+
+$$
+L_t = L_R + L_A + tL_w
+\tag{2}
+$$
+
+--
+
+对于水色遥感而言，所求的 `\(L_w\)` 即为：
+
+$$
+L_w = (L_t - L_R - L_A) / t
+\tag{3}
+$$
+--
+
+`\(L_R\)` 是大气分子导致的电磁信号，通常使用[标准大气](https://www.engineeringtoolbox.com/standard-atmosphere-d_604.html)模式确定，求解较为成熟。
+
+`\(L_A\)` 是气溶胶导致的电磁信号。气溶胶是液态或固态的颗粒物（粒径范围0.1~10μm），远大于大气分子但又足够小到漂浮在空气中数小时或数天。
+
+---
+
+因此，水色遥感中大气校正的.boldred[关键在于对气溶胶]信号、特征以及光谱的获取。气溶胶粒子的描述。[Ahmad等（2010）](https://www.osapublishing.org/ao/abstract.cfm?uri=ao-49-29-5545)假设气溶胶的PSD（[Particle Size Distribution](https://en.wikipedia.org/wiki/Particle-size_distribution)）由两个对数正态分布函数的叠加进行拟合。
+
+&lt;center&gt;&lt;img src="./figs/aero-PSD-Rh.png" height="330px" /&gt;&lt;/center&gt;
+
+.center[.bold[不同湿度条件下累积体积分布和颗粒粒径分布]]
+
+---
+
+使用降幂函数描述气溶胶的光谱特性，`气溶胶光学厚度`（深度） `\(\tau_a(\lambda)\)` 表示为：
+
+$$
+\frac{\tau_a(\lambda)}{\tau_a(\lambda_0)} = \Big(\frac{\lambda_0}{\lambda}\Big)^a
+\tag{4}
+$$
+
+其中 `\(a\)` 为著名的[埃斯特朗指数](https://en.wikipedia.org/wiki/Angstrom_exponent)，其值越高则颗粒越细，反之越粗（想象很粗的颗粒表现为平坦的AOD曲线）； `\(\lambda_0\)` 为参考波段。
+
+---
+
+因此，Ahmad等（2010）根据气溶胶中粗细颗粒物配比不同，在加之相对湿度差异（Rh）、几何角度、气溶胶类型等，构建了气溶胶光谱查找表（不同外界条件下主要为**十组**曲线）。
+
+&lt;center&gt;&lt;img src="./figs/epsilon-aerosol.png" height="450px" /&gt;&lt;/center&gt;
+
+.footnote[r&lt;sub&gt;eff&lt;/sub&gt; 等效粒径]
+
+---
+
+基于上述气溶胶的先验知识，如何开展对水体信号的大气校正呢？
+
+此处以经典的暗像元法为例，其他基于气溶胶查找表的方法大致都类似于它。
+
+公式（3）转化为如下反射率形式（ `\(\rho_{\text{RC}}\)` 表示为去除瑞利散射后的反射率）：
+
+`\begin{align}
+\rho_{\text{RC}}(\lambda) = \rho_{A}(\lambda) + t(\lambda)\rho_w(\lambda)
+\tag{5}
+\end{align}`
+假设水体光谱在 `\(\lambda_1\)` 和 `\(\lambda_2\)` 处水体信号为0（即暗像元），则满足：
+
+`\begin{align}
+\epsilon(\lambda_1, \lambda_2) = \frac{\rho_A(\lambda_1)}{\rho_A(\lambda_2)}
+\mathop{=}\limits_{满足暗像元} \frac{\rho_\text{RC}(\lambda_1)}{\rho_\text{RC}(\lambda_2)}
+\tag{6}
+\end{align}`
+
+---
+
+下面开始计算该像元的 `\(\rho_w(\lambda)\)` ：
+
+- 通过辅助数据获取该像元（或区域内）的相对湿度Rh，基于公式（6）计算出 `\(\epsilon(\lambda_1, \lambda_2)\)` （显然这个是存在误差的）；
+- 基于Rh参数对十种气溶胶光谱曲线（在LUT中）查找出最匹配的两个，分别令为 `\(\epsilon_\text{low}\)` 和 `\(\epsilon_\text{high}\)` ；
+- 假设全波段的 `\(\epsilon(\lambda, \lambda_2)\)` 与所计算的 `\(\epsilon(\lambda_1, \lambda_2)\)` 误差占比 `\(\Delta\)` 是相等的：
+
+`\begin{align}
+\Delta = \frac{\epsilon(\lambda_1, \lambda_2) - \epsilon_\text{low}(\lambda_1, \lambda_2)}{\epsilon_\text{high}(\lambda_1, \lambda_2) - \epsilon_\text{low}(\lambda_1, \lambda_2)} 
+\tag{7}
+\end{align}`
+
+- 因此，全波段的 `\(\rho_A(\lambda)\)` 可以根据上述变量计算：
+
+`\begin{align}
+\rho_A(\lambda) = [(1-\Delta)\epsilon_\text{low}(\lambda, \lambda_2) + \Delta\epsilon_\text{high}(\lambda, \lambda_2)]\rho_\text{RC}(\lambda_2)
+\tag{8}
+\end{align}`
+
+- 当 `\(\rho_A(\lambda)\)` 已知后，即可以根据公式（5）以及漫射透射率计算出 `\(\rho_w(\lambda)\)` 
+
+---
+
+显然，公式（6）并不为常态，浑浊的Case 2水体中NIR水体信号也无法忽略;以[Bailey等（2010）](https://www.osapublishing.org/oe/fulltext.cfm?uri=oe-18-7-7521&amp;id=196863)为代表提出了“.boldred[迭代法]”以解决非暗像元的问题，总体思路如下：
+
+- 假设近红外处（765和865 nm）水体的 `\(R_{rs}\)` 为0（`实际上不是`），并按Gordon的暗像元法进行计算得到 `\(R_{rs}(\lambda)\)` ；
+
+--
+- 根据.red[经验公式]计算出颗粒物后向散射光谱的斜率值 `\(\eta = 2\Big[1-1.2\exp\Big(0.9\frac{R_{rs}(443)}{R_{rs}(555)}\Big)\Big]\)` ；
+- 使用计算所得的 `\(R_{rs}(\lambda)\)` 根据.red[特定的算法]计算叶绿素浓度（ `\(Chl\)` ）;
+- 根据.red[经验公式]，基于Chl计算出 `\(a(670)=\exp(0.9389\ln(Chl)-3.7589)+a_w(670)\)` ；
+
+--
+- 基于 `\(a(670)\)` 与 `\(R_{rs}(\lambda)\)` 带入 `\(R_{rs}(\lambda) = \frac{f(\lambda)}{Q(\lambda)}\frac{b_b(\lambda)}{a(\lambda)+b_b(\lambda)}\)` 计算 `\(b_{bp}(670)\)` ，随后根据 `\(\eta\)` 值计算出 `\(b_{bp}(765)\)` ；
+- 随后，假设 `\(a(765|865) = a_w(765|865)\)` ，即.red[由纯水主导吸收]，计算出新的 `\(R_{rs}(765|865)\)` （`此时水体反射不为0了`）；
+
+--
+- 基于上述新计算出的NIR处 `\(R_{rs}\)` 再进行暗像元方法的校正，可以消除水体反射的影响，如此迭代直至收敛。
+
+---
+
+除了迭代法，[Wang和Shi（2007）](https://www.osapublishing.org/oe/fulltext.cfm?uri=oe-15-24-15722&amp;id=144789)使用了更远的波段以满足暗像元假设，[Ruddick等（2000）](https://www.osapublishing.org/ao/abstract.cfm?uri=ao-39-6-897)使用水体光谱的其他性状对气溶胶光谱进行估算，[Vanhellemont（2019）](https://www.sciencedirect.com/science/article/pii/S0034425719301014)在ACOLITE中实现的暗像元匹配方法；以及[Steinmetz等（2011）](https://www.osapublishing.org/oe/fulltext.cfm?uri=oe-19-10-9783&amp;id=213648#global-nav)针对遥感提出的光谱匹配方法POLYMER等等。
+
+--
+
+细看所有以上的这些算法（包括Bailey的NIR迭代法）我们不难发现这些算法的核心假设包括：
+
+- 基于气溶胶查找表；
+- 影像存在一定像素满足一定的光谱特征（暗像元或光谱相似性）；
+- 程辐射在空间均质（Ruddick和Vahellemont）。
+
+--
+
+算法在区域上的不通用，往往是BOA水体特性差异所致，这一方面导致水体信号假设为0失效，另一方面生物光学特性中的经验关系往往不够成立。此外，基于LUT方法还缺少对吸收型气溶胶的有效反演，是当前Case II水色大气校正的一个症结。
+
+---
+
+&lt;center&gt;&lt;img src="./figs/ACbTC.png" height="300px" /&gt;&lt;/center&gt;
+
+Bi等（2018）的研究围绕Sentinel-3 OLCI传感器展开，针对OLCI只存在1020 nm的SWIR波段的特性，使用同星载荷SLSTR的两个SWIR波段实现气溶胶校正。
+
+.footnote[
+
+[Bi S, Li Y, Wang Q, et al. Inland water atmospheric correction based on turbidity classification using OLCI and SLSTR synergistic observations[J]. Remote Sensing, 2018, 10(7): 1002.](https://www.mdpi.com/2072-4292/10/7/1002)
+
+]
+
+---
+
+layout: true
+
+# Atmospheric correction - Usage
+
+---
+
+### SeaDAS
+
+[SeaDAS](https://seadas.gsfc.nasa.gov/)是NASA专门针对Ocean Color影像数据而开发的一款全面的软件工具包，它包括了处理、展示、分析和质量控制等一些列操作。
+
+&lt;center&gt;&lt;img src="./figs/Black_Sea_Seadas.png" height="400px" /&gt;&lt;/center&gt;
+
+.center[SeaDAS的操作界面]
+
+---
+
+### SeaDAS
+
+SeaDAS的核心功能，或者说我们所重点关注的功能，在于其对Ocean Color影像的数据处理，即OCSSW。
+
+SeaDAS的GUI可以在Win、MacOS以及Linux操作系统下安装并使用，但OCSSW的组件只支持在非Win系统下安装使用。SeaDAS的安装和调用是一个充满技术性的过程，但从另外一个角度想这必然是作为水色遥感专业同学入门的基本功。
+
+好消息是，NASA称[SeaDAS](https://seadas.gsfc.nasa.gov/) 8.0.0将在2021年4月对Win开始OCSSW支持：
+
+&gt; SeaDAS OCSSW processing on Windows is not yet supported in SeaDAS 8.0.0, but is coming soon (.boldred[projected for April 2021]). For SeaDAS 7.x, to process SeaDAS OCSSW in Windows see the client/server model.
+
+但从实际角度出发，目前在MacOS和Linux环境下实现SeaDAS的使用仍然是大势所趋。
+
+---
+
+### SeaDAS
+
+SeaDAS第二个使用难点在于，学会使用命令行对海量的数据进行批处理。
+
+.pull-left[
+
+如果你是作为OC产品的下游用户，即只关心L3或L4产品，那不需要做出其他自定义的操作。
+
+不过问题在于，内陆水体的复杂性往往使得一些SeaDAS内置的算法和操作对于我们所关心的研究区并不友好，此时就需要在OCSSW套件的基础上再进行“加工”。
+
+&gt; 这个时候就拉`seadasr`出来祭旗。
+
+]
+
+--
+
+.pull-right[
+
+![](./figs/seadasr.png)
+
+]
+
+---
+
+### SeaDAS
+
+一个简单的`seadasr`使用实例如图所示：
+
+&lt;center&gt;&lt;img src="./figs/seadasr-carbon.png" height="400px" /&gt;&lt;/center&gt;
+
+---
+
+### ACOLITE
+
+.pull-left[
+
+[ACOLITE](https://odnature.naturalsciences.be/remsem/software-and-data/acolite)是一种轻量级的针对海岸和内陆水体的大气校正软件，设计用于Landsat 5/7/8和Sentinel-2A/B的传感器数据。
+
+最近，ACOLITE也实现了对于米级（Metre-scale）分辨率卫星的水色大气校正以及OLCI等传感器的处理，潜力巨大。
+
+早期的ACOLITE使用IDL编写，在后续的版本改为Python实现，支持Win、MacOS和Linux多系统操作，支持命令行批处理，也支持简易的GUI处理。[代码](https://github.com/acolite/acolite)开源，[手册](https://odnature.naturalsciences.be/downloads/remsem/acolite/acolite_manual_20210114.0.pdf)详尽、值得学习借鉴。
+
+]
+
+
+.pull-right[
+
+![](./figs/acolite.png)
+
+.center[ACOLITE界面]
+
+]
+
+---
+layout: false
+class: inverse, middle, center
+
+# .larger[演示时间 &lt;br&gt; `seadasr`]
+
+.larger[10\~15 mins]
+
+---
+layout: false
+class: inverse, middle
+
+# .large[讨论🤔]
+
+.large[
+
+- 拿来主义还是自主创新？
+
+- 数量和质量的trade-off
+
+- 如何自己实现基于LUT的暗像元校正方法
+
+]
+
+---
+layout: false
+class: center, middle, inverse
+
+# Content
+
+.larger[.bold[
+
+Atmospheric correction &lt;br&gt;
+.boldred[Bio-optical model] &lt;br&gt;
+Optical water classification&lt;br&gt;
+Algal growth simulation&lt;br&gt;
+Miscellaneous
+
+]]
+
+---
+layout: true
+# Bio-optical model
+
+---
+
+生物光学模型（bio-optical model）：用于参数化水体组分（浮游植物、CDOM和碎屑物质等）的吸收和散射特性的分析或数值模型。其包含的内容一般为：
+
+
+- IOP与AOP之间的物理模型；
+
+- IOP与Biogeochemistry（生物地球化学）参数之间的模型；
+
+- 更经验的，AOP与Biogeochemistry的统计模型。
+
+Morel 2001：
+
+&gt; Bio-optical models can also refer to .boldred[various ways of describing and forecasting] the 'bio-optical state' of the ocean, namely the optical properties of a water body as a function of the biological activity within this water.
+
+---
+
+### IOP -&gt; AOP
+
+`\begin{align}
+R_{rs}(\lambda) = \frac{f(\lambda)}{Q(\lambda)}\frac{b_b(\lambda)}{a(\lambda)+b_b(\lambda)}
+\tag{9}
+\end{align}`
+
+### 散射和吸收的加性构成
+
+`\begin{align}
+a(\lambda) = a_w(\lambda) + a_{ph}(\lambda) + a_{d}(\lambda) + a_{g}(\lambda)
+\tag{10}
+\end{align}`
+
+`\begin{align}
+b_b(\lambda) = b_{bw}(\lambda) + B_{ph}(\lambda)\times b_{ph}(\lambda) + B_d(\lambda)\times b_d(\lambda)
+\tag{11}
+\end{align}`
+
+其中 `\(B\)` 为后向散射概率。
+
+---
+layout: true
+
+## Hydro/EcoLight
+
+---
+
+.pull-left[
+
+&lt;center&gt;&lt;img src="./figs/HE-interface.png" height="500px" /&gt;&lt;/center&gt;
+
+.center[HE6的初始化界面]
+
+]
+
+.pull-right[
+
+&lt;center&gt;&lt;img src="./figs/IOP-settings.png" height="500px" /&gt;&lt;/center&gt;
+
+.center[HE6的IOP模型选择]
+
+]
+
+---
+
+观察这些IOPs选项设置，有意思的是：
+
+- .bold[CLASSIC CASE 1 IOPs]: The IOPs are obtained from historical bio-optical models for Case 1 water.
+- .bold[CASE 2 IOPs]: The IOPs are obtained from .boldred[a generic 4-component bio-geo-optical model] for Case-2 water.
+- .bold[NEW CASE 2 IOPs]: Phytoplankton IOPs are obtained from the new Case 1 model, with .boldred[additional CDOM and minerals].
+
+--
+
+Mobley等（2014）建议摈弃Case 1和Case 2这种二极化的水体分类方式，因为它有时候会让很产生困惑。譬如，上面的NEW CASE 2 IOPs是用来模拟水色三要素中Phy属于Case 1水体但如CDOM和碎屑物质却是Case 2水的（这些物质通常也与Phy并不协变）。
+
+另外需要注意的是，Case 1和Case 2并不是“大洋水体”与“海岸、内陆水体”的同义词，自然情况中两者即存在连续的过渡，又存在时空上的相互包含。
+
+---
+
+&lt;center&gt;&lt;img src="./figs/HE-CASE2.png" height="300px" /&gt;&lt;/center&gt;
+
+- 组分1为纯水
+- 组分2为含叶绿素颗粒物
+- 组分3为CDOM但不和组分2协变
+- 组分4为碎屑物质但不和组分2协变
+
+---
+
+### 组分1 纯水
+
+
+
+
+.pull-left[
+
+#### 纯水吸收
+
+&lt;img src="index_files/figure-html/unnamed-chunk-2-1.png" width="100%" /&gt;
+
+]
+
+.pull-right[
+
+#### 纯水后向散射
+
+&lt;img src="index_files/figure-html/unnamed-chunk-3-1.png" width="100%" /&gt;
+
+]
+
+---
+
+### 组分2 Phytoplankton
+
+浮游植物吸收满足 `\(a_{ph}(\lambda) = [Chl] \times a^*_{ph}(\lambda)\)` 
+
+&lt;img src="index_files/figure-html/unnamed-chunk-4-1.png" width="50%" style="display: block; margin: auto;" /&gt;
+
+浮游植物的后向后向散射假设满足幂律指数 `\(b(\lambda)=b_0X^n\Big[\frac{\lambda_0}{\lambda}\Big]^m\)`
+
+---
+### 组分3 CDOM
+
+.pull-left[
+
+吸收满足 `\(a_g(\lambda) = a_g(\lambda_0)\exp ^{-S_{CDOM}(\lambda-\lambda_0)}\)`
+
+么得散射。
+
+]
+
+.pull-right[
+
+&lt;center&gt;&lt;img src="./figs/HE-CDOM.png" height="400px" /&gt;&lt;/center&gt;
+
+]
+
+---
+### 组分4 碎屑物质
+
+碎屑物质吸收满足 `\(a_{d}=[ISM] \times a^*_d(\lambda)\)`
+
+&lt;img src="index_files/figure-html/unnamed-chunk-5-1.png" width="50%" style="display: block; margin: auto;" /&gt;
+
+碎屑物质的后向后向散射假设同样满足幂律指数 `\(b(\lambda)=b_0X^n\Big[\frac{\lambda_0}{\lambda}\Big]^m\)`
+
+---
+
+IOP设置完成后，对环境状况与输出项目进行设置：
+
+.pull-left[
+
+#### 波段输出
+
+&lt;center&gt;&lt;img src="./figs/HE-Wavelength.png" height="380px" /&gt;&lt;/center&gt;
+
+.center[波段设置，注意非中心位置]
+
+]
+
+
+.pull-right[
+
+
+#### 气-水表面边界条件与天气模式
+
+- 风速
+- 折射系数
+- 太阳高度角、云层覆盖（RADTRAN-X）
+- 水柱底部状况（无限深、有底部反射）
+- 输出层数
+- ...
+
+]
+
+---
+
+.pull-left[
+
+当所有设置完毕后，会提示已经生成新的一个输入文件且询问你改如何进一步做模拟。
+
+- Hydrolight通过解算辐射传输方程（RTE）是用于获取与深度、天顶和方位角以及波长有关的辐射亮度值。如果需要知道不同方向上的辐射亮度，那RTE的解算是非常耗时的；
+- 但是，一些研究例如生态系统建模研究仅需要不同的辐照度或K函数，而这些物理量可以通过对所有方位角度上的（包括上半球、下半球和全球面的角度）辐射亮度积分求得，此时RTE的求解过程就会迅速很多。
+
+]
+
+.pull-right[
+
+&lt;center&gt;&lt;img src="./figs/HE-torun.png" height="500px" /&gt;&lt;/center&gt;
+
+]
+
+---
+
+#### 输入文件（请参考安装目录中documents中的用户手册）
+
+.scroll-output[
+
+
+```
+##  [1] "0, 400, 700, 0.02, 488, 0.00026, 1, 5.3"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+##  [2] "Homogeneous chl profiles"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+##  [3] "Homo-10-5-0.2-0.1-3.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+##  [4] "0, 0, 0, 1, 0, 1"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+##  [5] "2, 1, 0, 2, 3, 0"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+##  [6] "4, 4"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+##  [7] "0, 11.20, 0.58, 3"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+##  [8] "0, 1, 440, 1, 0.014"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+##  [9] "0, 0, 440, 1, 0.014"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+## [10] "0, 4, 440, 1, 0.017"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+## [11] "0, 0, 440, 1, 0.014"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+## [12] "../data/H2OabDefaults_FRESHwater.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+## [13] "C:/HE60/data/user/astarchl_Taihu_NNU.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+## [14] "astarDummy.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+## [15] "../data/examples/minerals/astarmin_average.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+## [16] "0, -999, -999, -999, -999, -999"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+## [17] "1, 550, 0.3, 1, 0.62, -999"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+## [18] "-1, -999, 0, -999, -999, -999"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+## [19] "0, -999, -999, -999, -999, -999"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+## [20] "bstarDummy.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+## [21] "dummybstar.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+## [22] "dummybstar.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+## [23] "../data/examples/minerals/bstarmin_average.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+## [24] "0,0,550,0.01,0"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+## [25] "0,0,550,0.01,0"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+## [26] "0,0,550,0.01,0"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+## [27] "0,0,550,0.01,0"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+## [28] "dpf_pure_H2O.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+## [29] "dpf_Petzold_avg_particle.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
+## [30] "dpf_Petzold_avg_particle.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
+## [31] "dpf_Petzold_avg_particle.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
+## [32] "101"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+## [33] "397.5,402.5,407.5,412.5,417.5,422.5,427.5,432.5,437.5,442.5,447.5,452.5,457.5,462.5,467.5,472.5,477.5,482.5,487.5,492.5,497.5,502.5,507.5,512.5,517.5,522.5,527.5,532.5,537.5,542.5,547.5,552.5,557.5,562.5,567.5,572.5,577.5,582.5,587.5,592.5,597.5,602.5,607.5,612.5,617.5,622.5,627.5,632.5,637.5,642.5,647.5,652.5,657.5,662.5,667.5,672.5,677.5,682.5,687.5,692.5,697.5,702.5,707.5,712.5,717.5,722.5,727.5,732.5,737.5,742.5,747.5,752.5,757.5,762.5,767.5,772.5,777.5,782.5,787.5,792.5,797.5,802.5,807.5,812.5,817.5,822.5,827.5,832.5,837.5,842.5,847.5,852.5,857.5,862.5,867.5,872.5,877.5,882.5,887.5,892.5,897.5,902.5"
+## [34] "0,0,0,0,2"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
+## [35] "2, 3, 30, 0, 0"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+## [36] "-1, 0, 0, 29.92, 1, 80, 2.5, 15, 5, 300"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+## [37] "2, 1.34, 20, 35, 3"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+## [38] "0, 0"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+## [39] "0, 16, 0, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2, 2.2, 2.4, 2.6, 2.8, 3"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+## [40] "../data/H2OabDefaults_FRESHwater.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+## [41] "1"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+## [42] "dummyac9.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
+## [43] "dummyFilteredAc9.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+## [44] "dummyHscat.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+## [45] "dummyCHLdata.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+## [46] "dummyCDOMdata.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+## [47] "dummyR.bot"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+## [48] "dummyComp.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+## [49] "dummyCHLdata.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+## [50] "dummyComp.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+## [51] "dummyComp.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+## [52] "DummyIrrad.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+## [53] "../data/examples/So_biolum_user_data.txt"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+## [54] "DummyRad.txt"
+```
+
+]
+
+---
+
+#### 输出文件
+
+&lt;center&gt;&lt;img src="./figs/HE-excel.png" height="500px" /&gt;&lt;/center&gt;
+
+---
+
+### 基于HE的应用研究
+
+- Xi H, Hieronymi M, Krasemann H, et al. Phytoplankton group identification using simulated and in situ hyperspectral remote sensing reflectance[J]. Frontiers in Marine Science, 2017, 4: 272.
+
+- Lee Z P, Du K P, Arnone R. A model for the diffuse attenuation coefficient of downwelling irradiance[J]. Journal of Geophysical Research: Oceans, 2005, 110(C2).
+
+- Lee Z P, Du K P, Arnone R, et al. Penetration of solar radiation in the upper ocean: A numerical model for oceanic and coastal waters[J]. Journal of Geophysical Research: Oceans, 2005, 110(C9).
+
+- Xue K, Zhang Y, Ma R, et al. An approach to correct the effects of phytoplankton vertical nonuniform distribution on remote sensing reflectance of cyanobacterial bloom waters[J]. Limnology and Oceanography: Methods, 2017, 15(3): 302-319.
+
+
+---
+layout: false
+class: inverse, middle, center
+
+# .larger[演示时间 &lt;br&gt; Hydro/EcoLight]
+
+.larger[8\~10 mins]
+
+---
+layout: false
+class: inverse, middle
+
+# .large[讨论🤔]
+
+.large[
+
+- HE（Hydro/EcoLight）可以用来做什么？
+
+- HydroLight和EcoLight如何选择？ 
+
+- HE模拟结果和真实水体光学一致吗？
+
+]
+
+
+---
+layout: false
+class: center, middle, inverse
+
+# Content
+
+.larger[.bold[
+
+Atmospheric correction &lt;br&gt;
+Bio-optical model &lt;br&gt;
+.boldred[Optical water classification]&lt;br&gt;
+Algal growth simulation&lt;br&gt;
+Miscellaneous
+
+]]
+
+
+---
+layout: true
+
+# Optical water classification
+
+---
+
+水体光学分类的历史进展（[Arnone，2004](https://tos.org/oceanography/assets/docs/17-2_arnone.pdf)）：
+
+- 水质定量分类的起源可以追溯到1865年对Secchi disc的使用；
+
+--
+
+- 19世纪晚期到20世纪初，基于颜色的比较器（color-based comparator），即FUI的发明第一次利用“水色”这个概念去定义水体质量；
+
+--
+
+- 水下辐射测量在二战末期的发展使得光学水质分类正式成为一种定量科学，Jerlov于1951年基于全球的漫射衰减系数光谱对大洋（3类）和近海岸（9类）水体进行区分；
+
+--
+
+- 在水体辐射传输理论发展和更新后，依据水体的生物光学属性，Morel和Prieur（1997）对海洋水体划分为Case 1和Case 2；
+
+--
+
+- 到现在，大量的分类方法被建立并应用于各种各样的应用：光谱聚类、主成分分析、质量评价、算法混合等等。
+
+
+---
+
+.pull-left[
+
+&lt;center&gt;&lt;img src="./figs/Forel-Ule-500.png" height="450px" /&gt;&lt;/center&gt;
+
+.center[.bold[FUI比色卡&lt;br&gt;Color-based comparator]]
+
+]
+
+.pull-right[
+
+&lt;center&gt;&lt;img src="./figs/Jerlov-788.png" height="450px" /&gt;&lt;/center&gt;
+
+.center[.bold[Jerlov分类]]
+
+]
+
+---
+
+[Bi等（2019）](https://www.osapublishing.org/viewmedia.cfm?uri=oe-27-24-34838&amp;seq=0)针对水体光谱数据构建了改进型FCM聚类方法，FCMm，以实现复杂内陆水体中各水体类型隶属度的合理分配。
+
+在后续的研究中，[Bi等（2021）](https://ieeexplore.ieee.org/abstract/document/9361570/)基于FCMm方法开发了顾及隶属度的算法评估方案，以优化已有研究中Chla混合计算方法中的不足。
+
+上述两个研究中，构建了[FCMm的R语言函数包](https://github.com/bishun945/FCMm)以便后续进一步开发和应用。
+
+&lt;center&gt;&lt;img src="./figs/FCMm.png" height="250 px" /&gt;&lt;/center&gt;
+
+---
+layout: true
+
+# FCMm
+
+---
+
+### 从Github安装FCMm函数包
+
+
+```r
+# install it from GitHub quickly by `devtools` package
+devtools::install_github('bishun945/FCMm')
+
+# or use `remotes` package
+remotes::install_github('bishun945/FCMm')
+
+# install it and build vignettes 
+devtools::install_github('bishun945/FCMm', build_vignettes=TRUE)
+```
+
+
+### 在R的IDE中（Rstudio）中载入FCMm包
+
+
+```r
+library(FCMm)
+```
+
+---
+
+### 功能介绍
+
+- 模糊聚类：通过优化数据集中的模糊度系数（*m*值）以计算出一组新的聚类中心与隶属度函数；
+- Chla估算：以Rrs为输入，一键运行常用的Chla算法；
+- 算法评估：基于一种自举式的评分方法对于候选算法进行评价并给出最优选的混合结果；
+- 影像处理：函数包支持对于影像进行处理和制图（依赖于`raster`包）；
+- 数据共享：函数包中配置了多个开源数据集，以供测试和应用。
+
+### 文档手册
+
+包含了三份操作手册（vignette）介绍了FCMm的使用方式，安装完成后可以通过键入`vignette("Assessment")`，`vignette("Builtin_centrodis")`以及`vignette("Cluster_new_data")`调出手册。
+
+---
+
+### 对待训练的光谱数据集确定最优选模糊度系数*m*
+
+令输入变量为`x`，定义最大*m*取值为10，对x进行面积归一化处理（`do.stand = TRUE`）且所用的距离度量为欧氏距离的平方（`dmetric = "sqeuclidean"`）。
+
+.boldred[`FuzzifierDetermination`]函数返回列表变量，其中`m.used`为优化后的*m*值（调用方式为`res_FD$m.used`）。
+
+
+```r
+library(FCMm)
+res_FD &lt;- FuzzifierDetermination(x, max.m = 10, 
+                                 do.stand = TRUE, 
+                                 dmetric = 'sqeuclidean')
+```
+
+---
+
+### 对确定模糊度系数*m*的变量`x`实现FCM聚类
+
+
+使用.boldred[`FCM.new`]函数，输入变量为上述函数的返回值`res_FD`，给定最佳聚类数量为`K = 4`，并选择绘制隶属度的扰动点图。
+
+随后，将所得的聚类结果作为.boldred[`plot_spec`]函数的输入，即可得到光谱聚类的可视化结果。
+
+
+```r
+res_FCM &lt;- FCM.new(res_FD, 
+                   K = 4, 
+                   plot.jitter = TRUE)
+res_plot &lt;- plot_spec(res_FCM)
+```
+
+
+
+---
+
+### 对确定模糊度系数*m*的变量`x`实现FCM聚类-结果可视化
+
+
+```r
+res_plot &lt;- plot_spec(res_FCM)
+```
+
+.pull-left[
+
+&lt;img src="index_files/figure-html/unnamed-chunk-13-1.png" width="100%" style="display: block; margin: auto;" /&gt;
+
+]
+
+.pull-right[
+
+&lt;img src="index_files/figure-html/unnamed-chunk-14-1.png" width="100%" style="display: block; margin: auto;" /&gt;
+
+]
+
+---
+
+### 对确定模糊度系数*m*的变量`x`实现FCM聚类-结果可视化
+
+
+```r
+res_plot &lt;- plot_spec(res_FCM, 
+                      show.stand = TRUE, show.ribbon = TRUE)
+```
+
+.pull-left[
+
+&lt;img src="index_files/figure-html/unnamed-chunk-16-1.png" width="100%" style="display: block; margin: auto;" /&gt;
+
+]
+
+.pull-right[
+
+&lt;img src="index_files/figure-html/unnamed-chunk-17-1.png" width="100%" style="display: block; margin: auto;" /&gt;
+
+]
+
+---
+
+### Chla估算算法的运行
+
+使用`run_all_Chla_algorithms`函数实现，可以通过运行`Chla_algorithms_name()`函数以查看当前`FCMm`中支持的Chla算法，也可以单独运行某一支持的叶绿素a算法，如`TC2()`或`QAA_v5()`。以`FCMm`中示例数据`WaterSpec35`为例，.boldred[`run_all_Chla_algorithms`]运行方式如下。
+
+
+
+```r
+library(FCMm)
+data(WaterSpec35)
+out &lt;- run_all_Chla_algorithms(WaterSpec35[,-c(1,2)])
+```
+
+
+```
+##   BR_Gil10 TBA_Gil10       C6    Bloom OC4_OLCI OCI_Hu12 BR_Git11 TBA_Git11
+## 1 21.33498  20.13292 151.0796 295.8547 5.270190 4.016971 23.62878  18.88131
+## 2 22.25389  21.67825 150.5864 295.0187 6.830336 5.124522 24.81150  20.99625
+##   NDCI_Mi12 FBA_Le13 FBA_Yang10 SCI_Shen10   Gons08 TC2_final TC2_clean
+## 1  12.59328 14.22417   22.23022   6.340887 17.90147  17.02779  15.85361
+## 2  13.26970 20.81402   25.20458        NaN 18.67595  17.43319  16.24144
+##   TC2_turbid
+## 1   17.02779
+## 2   17.43319
+```
+
+---
+
+### Chla估算算法的运行
+
+&lt;img src="index_files/figure-html/unnamed-chunk-20-1.png" width="60%" style="display: block; margin: auto;" /&gt;
+
+---
+
+### 使用混合计算方法实现Chla估算
+
+以遥感反射率光谱为输入运行Blend_FCMm混合计算方法、Blend_Jac17或Blend_Moo14的操作如下
+
+
+```r
+library(FCMm)
+data(WaterSpec35)
+result1 &lt;- Blend_FCMm(WaterSpec35[, -c(1,2)])
+result2 &lt;- Blend_Jac17(WaterSpec35[, -c(1,2)])
+result3 &lt;- Blend_Moo14(WaterSpec35[, -c(1,2)])
+```
+
+.small[
+
+**References**
+
+- Jackson T, Sathyendranath S, Mélin F. An improved optical classification scheme for the Ocean Colour Essential Climate Variable and its applications[J]. Remote Sensing of Environment, 2017, 203: 152-161.
+- Moore T S, Dowell M D, Bradt S, et al. An optical water type framework for selecting and blending retrievals from bio-optical algorithms in lakes and coastal waters[J]. Remote sensing of environment, 2014, 143: 97-111.
+- Bi S, Li Y, Liu G, et al. Assessment of Algorithms for Estimating Chlorophyll-a Concentration in Inland Waters: A Round-Robin Scoring Method Based on the Optically Fuzzy Clustering[J]. IEEE Transactions on Geoscience and Remote Sensing, 2021.
+
+]
+
+---
+
+### 使用混合计算方法实现Chla估算
+
+&lt;img src="index_files/figure-html/unnamed-chunk-22-1.png" width="70%" style="display: block; margin: auto;" /&gt;
+
+---
+
+### 算法评估
+
+已知数据集的隶属度memb、候选算法的估算值pred、水质参数真实值meas，使用自举式算法评估方法首先需要通过Getting_Asses_results进行数据的预处理，随后使用Scoring_system或Scoring_system_bootstrap做算法的相对比较，操作如下
+
+
+```r
+library(FCMm)
+Asses_input &lt;- Getting_Asses_results(sample.size = nrow(memb), 
+                                     pred = pred, 
+                                     mes = meas, 
+                                     memb = memb)
+Score &lt;- Scoring_system(Asses_input)
+Score_boo &lt;- Scoring_system_bootstrap(Asses_input, 
+                                      Times = 1000, 
+                                      method = 'sort-based')
+```
+
+&gt; 请转至Rstudio再运行Help中的DEMO
+
+---
+layout: false
+class: inverse, middle
+
+# .large[讨论🤔]
+
+.large[
+
+- 用哪一种分类体系/聚类中心？
+
+- 分类不是最终目的，着力于分类后的应用
+
+- 合理的分类方法
+
+]
+
+
+---
+layout: false
+class: center, middle, inverse
+
+# Content
+
+.larger[.bold[
+
+Atmospheric correction &lt;br&gt;
+Bio-optical model &lt;br&gt;
+Optical water classification&lt;br&gt;
+.boldred[Algal growth simulation]&lt;br&gt;
+Miscellaneous
+
+]]
+
+---
+layout: true
+
+# Algal growth simulation
+
+---
+
+2020年12月16日我们分享了AlgalGame模型的构建和“尝试”求解的内容：Klausmeier和Litchman（2001）构建的“反应-扩散-趋性”藻类生长模型试图在营养盐和光照这两个限制条件下确定藻类生物量的时空分布，并基于此构建了简易版的博弈论理论模型。
+
+
+藻类的.red[进化稳定策略]（Evolutionarily stable strategy，ESS）是同时受两种资源限制后确定的深度（即光照与营养盐的平衡位置）。换句话说，大部分藻类群体为了生存下去，会.boldred[调节自身位置到水柱中两种资源均衡的深度]：随着养分供给增加，ESS层变浅；随光供应的增加，ESS层变深。
+
++ 对于低营养水平、低*K_d_*（清澈）和浅水柱，会形成底栖（qi）层；
+
++ 对于深水柱的中等养分水平，易出现DCM型；
+
++ 对于高营养水平水柱，易出现表层堆积型（水华）
+
+前期回顾请转[这里](https://bishun945.github.io/presentation20201216)。
+
+---
+
+这是AlgalGame模型中的藻生物量平衡方程、营养盐平衡方程、边界条件以及光照函数：
+
+.smaller[
+
+`\begin{align}
+\frac{\partial{b}}{\partial{t}} =
+\overbrace{\underbrace{\min\{f_I(I), f_R(R)\}b}_{\text{Growth}} -
+\underbrace{mb}_{\text{Loss}}}^\text{Reaction}+
+\underbrace{\overbrace{D_b\frac{\partial^2b}{\partial z^2}}^\text{Diffusion}}_{\text{Passive movement}} +
+\underbrace{\overbrace{\frac{\partial}{\partial z}\Big[\ v \Big( \frac{\partial g}{\partial z}\Big) \Big]}^\text{Taxis}}_\text{Active movement}
+\end{align}`
+
+`\begin{align}
+\text{with B.C. } {\Big[ D_b \frac{\partial b}{\partial z} + v \Big( \frac{\partial g}{\partial z} \Big) b \Big]}\bigg |_{z=0}  = {\Big[ D_b \frac{\partial b}{\partial z} + v \Big( \frac{\partial g}{\partial z} \Big) b \Big]}\bigg |_{z=z_b}  =  0 
+\end{align}`
+
+
+`\begin{align}
+\frac{\partial R}{\partial t} = 
+\underbrace{-\frac{b}{Y}\min\{f_I(I), f_R(R)\}}_\text{Uptake} + 
+\underbrace{D_R \frac{\partial ^2 R}{\partial z^2}}_\text{Mixing} + 
+\underbrace{\varepsilon m \frac{b}{Y}}_\text{Recycling}
+\end{align}`
+
+`\begin{align}
+\text{with B.C. } \frac{\partial R}{\partial z} \bigg |_{z=0} = 0, \frac{\partial R}{\partial z}\bigg |_{z=z_b} = h(R_{in}-R(z_b))
+\end{align}`
+
+`\begin{align}
+I(z)=I_{\text{in}}\text{exp}\bigg(-\int_0^z[ab(z)+a_{bg}]dz\bigg)
+\end{align}`
+
+]
+
+---
+
+我们甚至手动地求解了一维扩散方程（以及加入趋性项的方程）——基于时空格网和显示有限差分方法。
+
+&lt;img src="index_files/figure-html/unnamed-chunk-24-1.png" width="40%" style="display: block; margin: auto;" /&gt;
+
+---
+
+但是，经过很长很长一段时间的尝试，我发现想要准确且稳定的求解这个偏微分方程组是及其困难的。
+
+如果仔细调研其他研究结果，会发现很多学者在这方面的研究差不多都是“提出了方程组”但求解过程是模糊的，而实际上利用现有的求解工具（solver）能够得到比自己手动编写更快更好的数值解，即“不要重复造轮子”。
+
+---
+
+接着，我找到了CRAN中求解PDEs极为高效的`ReacTran`，`rootSolve`和`deSolve`等函数包。这些包在提供极为便捷的格网构建函数且编译了FORTRAN库中较为流行的一些solver，比如`vode`。
+
+--
+
+这些函数包使用起来也着实费劲（更多的是理解上的），譬如如何将上述PDEs转化为这些函数认知的系数或function？
+
+`ReacTran`等这三个包给出了详细的文档说明并给出了好些个有趣的例子，以我们的研究对象——“反应-扩散-趋性”为例，那实际上单独一个偏微分方程可以概括为：
+
+.small[
+
+`\begin{align}
+\frac{\partial{b}}{\partial{t}} =
+\overbrace{\underbrace{\min\{f_I(I), f_R(R)\}b}_{\text{Growth}} -
+\underbrace{mb}_{\text{Loss}}}^\text{Reaction}+
+\underbrace{\overbrace{D_b\frac{\partial^2b}{\partial z^2}}^\text{Diffusion}}_{\text{Passive movement}} +
+\underbrace{\overbrace{\frac{\partial}{\partial z}\Big[\ v \Big( \frac{\partial g}{\partial z}\Big) \Big]}^\text{Taxis}}_\text{Active movement}
+\end{align}`
+
+]
+
+&gt; 构建很多很多个小的函数，然后一个一个的套娃塞进去，最后放到求解器
+
+---
+
+最后，我将求解完毕后的AlgalGame模型打包部署在了Github上，提供了时空格网与其他参数的输入接口，能够实现藻类的生长模拟。
+
+### 下载
+
+
+```r
+remotes::install_github("bishun945/AlgalGame")
+```
+
+
+### `Shiny`
+
+加入了`Shiny`的魔法，现在AlgalGame支持在线的简单模拟且能够下载数据。
+
+请移步这个[网站](https://bishun945.shinyapps.io/AlgalGameShiny/)。
+
+---
+layout: false
+class: inverse, middle
+
+# .large[讨论🤔]
+
+.large[
+
+- IOCCG2021的报告中展望了水色Algorithm和生态Model之间的耦合，他们之间能够产生什么样的火花？
+
+- AlgalGame的模拟过于理想化和简易，函数包提供了可扩展的修改方式（通过添加你自己的小函数，实名表扬Junda Li👍）
+
+- 如何克服被数学公式支配的恐惧（雾，逃）
+
+]
+
+---
+layout: false
+class: center, middle, inverse
+
+# Content
+
+.larger[.bold[
+
+Atmospheric correction &lt;br&gt;
+Bio-optical model &lt;br&gt;
+Optical water classification&lt;br&gt;
+Algal growth simulation&lt;br&gt;
+.boldred[Miscellaneous]
+
+]]
+
+---
+layout: true
+
+# Miscellaneous
+
+---
+
+### TSSIM: Time-Series-based Spatial Interpolation Method
+
+写了这个包来实现DINEOF算法，用于对存在空缺值的时序影像（单变量，如Chla）进行插补，其主要运用的是EOF分解的功能。
+
+**核心原理**：EOF前几个成分能够包含整个数组的绝大部分信息，反之通过这些成分也可以反推原始数组，利用一些替补值对缺失值进行替换后实现EOF分解并不断重构，最终满足一定收敛条件后完成插补。
+
+**原理及应用请参考**：
+
+- Beckers J M, Rixen M. EOF calculations and data filling from incomplete oceanographic datasets[J]. Journal of Atmospheric and oceanic technology, 2003, 20(12): 1839-1856.
+- Taylor M H, Losch M, Wenzel M, et al. On the sensitivity of field reconstruction and prediction using empirical orthogonal functions derived from gappy data[J]. Journal of Climate, 2013, 26(22): 9194-9205.
+
+---
+
+### DAMATO: Data Management Tools
+
+数据管理工具，对于实验室收集的数据进行整理并作出质量控制，目前开源于[Github仓库](https://github.com/bishun945/DAMATO/)。
+
+&lt;center&gt;&lt;img src="./figs/DAMATO.png" height="350 px" /&gt;&lt;/center&gt;
+
+**请跳转至Rstudio进行演示**
+
+---
+layout: false
+class: center, middle, inverse
+
+.size-40[![thanks](./figs/thanks-trans.gif)]
+
+感谢我们组里两位老师和同学们这么多年来对我工作的支持
+
+.white[
+Please see more about me via my 
+[.boldred[Resume]](https://bishun945.github.io/CV/),
+[.boldred[Github]](https://github.com/bishun945), or 
+[.boldred[ResearchGate]](https://www.researchgate.net/profile/Shun_Bi)
+]
+
+
+
+
+
+
+
+
+
+
+
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"slideNumberFormat": "%current%",
+"highlightStyle": "github",
+"highlightLines": true,
+"ratio": "16:9",
+"countIncrementalSlides": false,
+"navigation": {
+"scroll": false
+}
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+(function(time) {
+  var d2 = function(number) {
+    return ('0' + number).slice(-2); // left-pad 0 to minutes/seconds
+  },
+
+  time_format = function(total) {
+    var secs = Math.abs(total) / 1000;
+    var h = Math.floor(secs / 3600);
+    var m = Math.floor(secs % 3600 / 60);
+    var s = Math.round(secs % 60);
+    var res = d2(m) + ':' + d2(s);
+    if (h > 0) res = h + ':' + res;
+    return res;  // [hh:]mm:ss
+  },
+
+  slide_number_div = function(i) {
+    return document.getElementsByClassName('remark-slide-number').item(i);
+  },
+
+  current_page_number = function(i) {
+    return slide_number_div(i).firstChild.textContent;  // text "i / N"
+  };
+
+  var timer = document.createElement('span'); timer.id = 'slide-time-left';
+  var time_left = time, k = slideshow.getCurrentSlideIndex(),
+      last_page_number = current_page_number(k);
+
+  setInterval(function() {
+    time_left = time_left - 1000;
+    timer.innerHTML = ' ' + time_format(time_left);
+    if (time_left < 0) timer.style.color = 'red';
+  }, 1000);
+
+  slide_number_div(k).appendChild(timer);
+
+  slideshow.on('showSlide', function(slide) {
+    var i = slide.getSlideIndex(), n = current_page_number(i);
+    // reset timer when a new slide is shown and the page number is changed
+    if (last_page_number !== n) {
+      time_left = time; last_page_number = n;
+      timer.innerHTML = ' ' + time_format(time); timer.style.color = null;
+    }
+    slide_number_div(i).appendChild(timer);
+  });
+})(90000);
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
